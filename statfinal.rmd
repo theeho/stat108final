@@ -6,8 +6,47 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+```{r}
+library(tidyverse)
+```
+
+Narative: 
+
+What musical characteristics of  an electronic song make it popular? This is the question I aim to answer in my project. 
+
+By characteristics of a song, I mean the basic features in the context of music theory such as tempo, key, time signature, etc. But I also mean more complex features in the context of how humans interpret music such as, loudness, energy, danceability, etc.
+
+By popularity of a song, I mean how many times that song was listened to compared to other songs. 
+
+For music producers, an accurate answer to this question would be very valuable as it would give them evidence for selecting target characteristics to maximize a songs popularity. It would also give them target characteristics for a certain type of song. For example, if a music producer wanted to create a high energy and very danceable song, they would have evidence as to which key, time signature, tempo, etc. they would need to maximize the songs popularity. 
+
+My response variable would be the popularity of a song based on its musical characteristics. However, my dataset only contains time-series measures of popularity. That is, my dataset only contains information of how popular a song is currently but I am more interested in how popular a song is independent of when it was uploaded. The songs popularity in the dataset is also dependent on the popularity of the artists from the assumption that more popular artists have bigger platforms to promote their song. I would like my response variable to also be independent of the popularity of the artists. Therefor I need to construct a custom response variable.
+
+I am not certain what my response variable will be specifically. But here are some ideas I have. My response variable will be independent from the upload date of a track and indpendent from the number of followers the songs artists have. I am looking for ways to construct a response variable that matches these conditions.  
+
+
+
+My hypothesis is that a songs popularity is dependedent on its musical characteristics. 
+
+
+
+Data:
+
+This dataset is retreived from Spotify's API. I will attach the python script I used to create the dataset. Please note, the python script is very messy right now. It contains some functions that I ended up not using and other useless blocks of code I used for testing. I plan to clean it up and comment it later.
+
+The dataset was created by selecting playlists within the Electronic Music Genre, then calling the API to retreive track information for every track within every playlist. Then for every track I called the API again to get information that was not included in the first call. This is information like artist information and upload date. I then parsed everything into a dictionary and wrote it to the CSV file. 
+
+I still need to do a bit more cleaning of the dataset. I need to remove some duplicates. I also need to remove old tracks that have been republished in new albums. These old tracks have a popularity near 0 because only their republished version is being listened to by users. The old track and the republished version are otherwise identical but the republished version has the accurate popularity.
+
+I have been working on cleaning and creating the dataset for some time and while I wanted to have a complete polished dataset for this proposal, I am running out of time so I thought I would just submit what I have. 
+
+For the dataset, I wanted a tracks audio features (the characteristics described above) and metrics to help me build my response variable (current track popularity, time uploaded, track artists follower counts)
+
 
 ```{r}
-
+data <- read.csv('data/spotify_tracks.csv')
+```
+```{r}
+glimpse(data)
 ```
 
