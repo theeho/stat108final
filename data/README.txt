@@ -1,5 +1,6 @@
 
 Link to Spotify API: https://developer.spotify.com/documentation/web-api/reference/#/ 
+Link to Python script to build dataset: https://colab.research.google.com/drive/1VIpipujOuut-qT1iVkMw8lASIqxjEGDv?usp=sharing
 ========SONG CHARACTERISTICS========
  
 Spotifys "Audio Features"
