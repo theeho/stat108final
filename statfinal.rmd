@@ -57,7 +57,7 @@ summary(track_data)
 t_popularity <- ggplot(track_data, aes(x=track.popularity)) + geom_histogram()
 t_popularity
 ```
-The track popularity seems very normal, asside from the outliers at 0 popularity. Maybe I can change my problem with the given that the track popularity will not be 0? This would allow me to remove such outliers. 
+The track popularity seems very normal, asside from the outliers at 0 popularity. Maybe I can change my problem  with the given that the track popularity will not be 0? This would allow me to remove such outliers. 
 
 Lets see if there may be an ascociation between track popularity and the average artist popularity. 
 ```{r}
@@ -66,6 +66,68 @@ popart
 ```
 
 As expected, we can observe a possible association between the popularity of tracks and their artists. We may need to investigate the outlier tracks with popularity is 0. 
+
+Lets observe some of the interesting cases, when the popularity of the artists are high but the track popularity is 0. 
+
+```{r}
+ztpop <- track_data %>% filter(track.popularity == 0) %>% filter((pop/num.artist) > 75)
+glimpse(ztpop)
+```
+Lets observe the song with track id = 4V9HEnprK5MfCGL8bHHy7y in this new data frame. 
+The song url is https://open.spotify.com/track/4V9HEnprK5MfCGL8bHHy7y
+
+We can see that this song is identical to a song with a different track id of  2MGRnjJc7C0z3EOEWRqcMw and url of https://open.spotify.com/track/2MGRnjJc7C0z3EOEWRqcMw. 
+
+It appears that the first track id is an older publication of the same track. And the second track id is a new publication. The new publication has a track popularity of 63. This suggest that the track entry in my dataset is a corrupted entry because it does not accuratley represent the popularity of a song with given features.
+
+
+Lets examine the continuous audio features of a track and the track popularity. 
+```{r}
+pdance <- ggplot(data = track_data, aes(x = danceability , y = track.popularity)) + geom_point()+ stat_smooth(method = "lm", col = "red")
+
+penergy <- ggplot(data = track_data, aes(x = energy , y = track.popularity)) + geom_point()+ stat_smooth(method = "lm", col = "red")
+
+ploud <- ggplot(data = track_data, aes(x = loudness , y = track.popularity)) + geom_point()+ stat_smooth(method = "lm", col = "red")
+
+pspeech <- ggplot(data = track_data, aes(x = speechiness , y = track.popularity)) + geom_point()+ stat_smooth(method = "lm", col = "red")
+
+pacoustic <- ggplot(data = track_data, aes(x = acousticness , y = track.popularity)) + geom_point()+ stat_smooth(method = "lm", col = "red")
+
+pinstrum <- ggplot(data = track_data, aes(x = instrumentalness , y = track.popularity)) + geom_point()+ stat_smooth(method = "lm", col = "red")
+
+popart <- ggplot(data = track_data, aes(x = liveness , y = track.popularity)) + geom_point()+ stat_smooth(method = "lm", col = "red")
+
+pvalence <- ggplot(data = track_data, aes(x = valence , y = track.popularity)) + geom_point()+ stat_smooth(method = "lm", col = "red")
+
+ptempo <- ggplot(data = track_data, aes(x = tempo , y = track.popularity)) + geom_point()+ stat_smooth(method = "lm", col = "red")
+
+pdance
+penergy
+ploud
+pspeech
+pacoustic
+pinstrum
+pvalence
+ptempo
+
+```
+We can observe a possible corruption in the dataset in instrumentalness and acousticness. Is it likely that so many tracks have an instrumentalness or acousticness of 0? Or is this an error within the dataset?
+
+There also appears to be little evidence for a linear ascociation between these audio features.
+
+
+
+Based on the context of this problem, I would expect tracks with high energy would also have high loudness. Lets observe this ascociation. 
+
+```{r}
+louden <- ggplot(data = track_data, aes(x = loudness , y = energy)) + geom_point()+ stat_smooth(method = "lm", col = "red")
+louden
+```
+
+
+
+
+
 
 
 
