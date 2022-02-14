@@ -22,8 +22,9 @@ For music producers, an accurate answer to this question would be very valuable 
 
 My response variable would be the popularity of a song based on its musical characteristics. However, my dataset only contains time-series measures of popularity. That is, my dataset only contains information of how popular a song is currently but I am more interested in how popular a song is independent of when it was uploaded. The songs popularity in the dataset is also dependent on the popularity of the artists from the assumption that more popular artists have bigger platforms to promote their song. I would like my response variable to also be independent of the popularity of the artists. Therefor I need to construct a custom response variable.
 
-I am not certain what my response variable will be specifically. But here are some ideas I have. My response variable will be independent from the upload date of a track and indpendent from the number of followers the songs artists have. I am looking for ways to construct a response variable that matches these conditions.  
+To tackle the issue of the current popularity metric from the data-set being a time dependent variable. The response variable would be the time dependent popularity metric but it's predicted value would be calculated based on a given time and artist popularity.  
 
+This article :https://towardsdatascience.com/song-popularity-predictor-1ef69735e380 did a very similar thing to my project. Only it used the song popularity as a predictor variable to estimate the song features. That is, it analyzed the distribution of popular songs to predict the features of those songs. 
 
 
 My hypothesis is that a songs popularity is dependedent on its musical characteristics. 
@@ -32,18 +33,17 @@ My hypothesis is that a songs popularity is dependedent on its musical character
 
 Data:
 
-This dataset is retreived from Spotify's API. I will attach the python script I used to create the dataset. Please note, the python script is very messy right now. It contains some functions that I ended up not using and other useless blocks of code I used for testing. I plan to clean it up and comment it later.
+This dataset is retreived from Spotify's API. See the script below. 
 
 Script: https://colab.research.google.com/drive/1VIpipujOuut-qT1iVkMw8lASIqxjEGDv?usp=sharing
 
 
 The dataset was created by selecting playlists within the Electronic Music Genre, then calling the API to retreive track information for every track within every playlist. Then for every track I called the API again to get information that was not included in the first call. This is information like artist information and upload date. I then parsed everything into a dictionary and wrote it to the CSV file. 
 
-I still need to do a bit more cleaning of the dataset. I need to remove some duplicates. I also need to remove old tracks that have been republished in new albums. These old tracks have a popularity near 0 because only their republished version is being listened to by users. The old track and the republished version are otherwise identical but the republished version has the accurate popularity.
+I may need to do some more data augmentation. For example, I may want to augment some of the predictor variables I imagine to have no linear relationship with the response based on the context of the problem to be categorical to account for this non-linear relationship. 
 
-I have been working on cleaning and creating the dataset for some time and while I wanted to have a complete polished dataset for this proposal, I am running out of time so I thought I would just submit what I have. 
+This article: https://towardsdatascience.com/song-popularity-predictor-1ef69735e380 used logistic regression which is evidence that categorical variables may be more accurate predictors. It also did a fair bit more cleaning of the dataset. Which is evidence that I may need to look at my data more closely for corrupted entries. 
 
-For the dataset, I wanted a tracks audio features (the characteristics described above) and metrics to help me build my response variable (current track popularity, time uploaded, track artists follower counts)
 
 
 ```{r}
