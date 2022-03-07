@@ -1,0 +1,252 @@
+---
+title: "analysis"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(nnet)
+library(broom)
+library(corrplot)
+library(RColorBrewer)
+library(knitr)
+library(patchwork)
+```
+```{r}
+track_data <- read.csv('data/spotify_tracksV2.csv')
+track_data <- track_data %>% mutate(duration_ms = duration_ms / 1000) %>% filter_all(any_vars(! is.na(.)))
+track_data <- rename(track_data,duration_sec = duration_ms)
+```
+
+```{r}
+data_fill_fac <- track_data %>% filter_all(any_vars(! is.na(.))) %>% mutate(genre = as.factor(genre)) %>% mutate(key = as.factor(key)) %>% mutate(mode = as.factor(mode)) %>% mutate(t_ID = row_number())
+```
+
+```{r}
+p_genre <- ggplot(data_fill_fac, aes(x=genre)) + geom_bar() + labs (y = "count", x = "track genre",
+                                                            title = "number of tracks per genre")
+p_genre
+
+
+
+
+```
+```{r}
+
+
+
+#g1 combines hiphop, metal, pop, and punk
+g1 <- track_data %>% mutate(genre = ifelse(genre == "hiphop", "other", ifelse(genre == "metal", "other", (ifelse(genre == "pop", "other", (ifelse(genre == "punk", "other", genre)))))))
+
+#g2 is the same as g1 but without country 
+g2 <- g1 %>% filter(genre != "country") 
+
+
+
+p_g1 <- ggplot(g1, aes(x=genre)) + geom_bar() + labs (y = "count", x = "track genre",
+                                                            title = "number of tracks per genre")
+
+p_g2 <- ggplot(g2, aes(x=genre)) + geom_bar() + labs (y = "count", x = "track genre",
+                                                            title = "number of tracks per genre")
+p_g1 + p_g2 
+
+```
+
+
+
+```{r}
+
+
+p_dance <- ggplot(data_fill_fac, aes(x=danceability)) + geom_histogram() + 
+  labs(y = "count", x = "danceability feature",
+       title = "danceability distribution")
+
+p_energy <- ggplot(data_fill_fac, aes(x=energy)) + geom_histogram() + 
+  labs(y = "count", x = "energy feature",
+       title = "energy distribution")
+
+p_loud <- ggplot(data_fill_fac, aes(x=loudness)) + geom_histogram() + 
+  labs(y = "count", x = "loudness feature",
+       title = "loudness distribution")
+
+p_speech <- ggplot(data_fill_fac, aes(x=speechiness)) + geom_histogram() + 
+  labs(y = "count", x = "speechiness feature",
+       title = "speechiness distribution")
+
+p_acoustic <- ggplot(data_fill_fac, aes(x=acousticness)) + geom_histogram() + 
+  labs(y = "count", x = "acousticness feature",
+       title = "acousticness distribution")
+
+p_live <- ggplot(data_fill_fac, aes(x=liveness)) + geom_histogram() + 
+  labs(y = "count", x = "liveness feature",
+       title = "liveness distribution")
+
+p_valence <- ggplot(data_fill_fac, aes(x=valence)) + geom_histogram() + 
+  labs(y = "count", x = "valence feature",
+       title = "valence distribution")
+
+p_tempo <- ggplot(data_fill_fac, aes(x=tempo)) + geom_histogram() + 
+  labs(y = "count", x = "track tempo",
+       title = "tempo distribution")
+
+p_duration <- ggplot(data_fill_fac, aes(x=duration_ms)) + geom_histogram() + 
+  labs(y = "count", x = "track duration (MS)",
+       title = "duration distribution")
+
+p_dance + p_energy + p_loud
+p_speech + p_acoustic + p_live
+p_valence + p_tempo + p_duration
+
+summary(data_fill_fac)
+```
+```{r}
+
+bg1_dance <- ggplot(g1, aes(genre, danceability)) + geom_boxplot() +labs (title = "danceability per genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bg1_energy <- ggplot(g1, aes(genre, energy)) + geom_boxplot() +labs (title = "energy per  genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bg1_loud <- ggplot(g1, aes(genre, loudness)) + geom_boxplot() +labs (title = "loudness per  genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bg1_speech <- ggplot(g1, aes(genre, speechiness)) + geom_boxplot() +labs (title = "speechiness per genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bg1_acoust <- ggplot(g1, aes(genre, acousticness)) + geom_boxplot() +labs (title = "acousticness per genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bg1_live <- ggplot(g1, aes(genre, liveness)) + geom_boxplot() +labs (title = "liveness per genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bg1_val <- ggplot(g1, aes(genre, valence)) + geom_boxplot() +labs (title = "valence per genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bg1_tempo <- ggplot(g1, aes(genre, tempo)) + geom_boxplot() +labs (title = "tempo per genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bg1_dur <- ggplot(g1, aes(genre, duration_sec)) + geom_boxplot() +labs (title = "duration (sec) per genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+bg1_dance + bg1_energy + bg1_loud
+bg1_speech + bg1_acoust + bg1_live
+bg1_val + bg1_tempo + bg1_dur
+
+```
+```{r}
+g_clas <- g1 %>% filter(genre == "classical" )
+g_country <- g1 %>% filter(genre == "country" )
+g_edm <- g1 %>% filter(genre == "edm_dance" )
+g_rock <- g1 %>% filter(genre == "rock" )
+g_other <- g1 %>% filter(genre == "other" )
+
+pkey_clas <- ggplot(g_clas, aes(x=key)) + geom_bar() + labs (y = "count", x = "track key",
+                                                            title = "number of classical tracks per key")
+
+pkey_country <- ggplot(g_country, aes(x=key)) + geom_bar() + labs (y = "count", x = "track key",
+                                                            title = "number of country tracks per key")
+
+pkey_edm <- ggplot(g_edm, aes(x=key)) + geom_bar() + labs (y = "count", x = "track key",
+                                                            title = "number of edm tracks per key")
+
+pkey_rock <- ggplot(g_rock, aes(x=key)) + geom_bar() + labs (y = "count", x = "track key",
+                                                            title = "number of rock tracks per key")
+
+pkey_other <- ggplot(g_other, aes(x=key)) + geom_bar() + labs (y = "count", x = "track key",
+                                                            title = "number of other tracks per key")
+
+pkey_clas + pkey_country
+pkey_edm + pkey_rock + pkey_other
+
+```
+
+```{r}
+glimpse(track_data)
+```
+
+
+
+```{r}
+ntype_data <- subset(track_data, select = -c(track.name, artists.names, artists.ids, artist.ids, track.id, release.date, type, id, time_signature, follow, pop, num.artist, genre, mode, key))
+corrplot(cor(ntype_data))
+```
+```{r}
+g1 <- g1 %>%  mutate(genre = as.factor(genre)) %>% mutate(key = as.factor(key)) %>% mutate(mode = as.factor(mode)) %>% mutate(t_ID = row_number())
+
+
+full_model <- multinom(genre ~ danceability + energy + loudness + speechiness + acousticness + instrumentalness + liveness + valence + tempo + duration_sec, data = g1)
+tidy(full_model, conf.int = TRUE, exponentiate = FALSE) %>%
+  kable(digits = 3, format = "markdown")
+```
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+pred_probs <- as_tibble(predict(full_model, type = "probs")) %>% 
+                        mutate(t_ID = 1:n()) 
+
+full_m_aug <- inner_join(g1, pred_probs, 
+                           by = "t_ID") %>%
+  select(t_ID, everything())
+
+full_m_aug <- full_m_aug %>% 
+  mutate(pred_gen = predict(full_model, type = "class"))
+
+residuals <- as_tibble(residuals(full_model)) %>%  #calculate residuals
+  setNames(paste('resid.', names(.), sep = "")) %>% #update column names
+  mutate(t_ID = 1:n()) #add obs number
+
+
+full_m_aug <- inner_join(full_m_aug, residuals, by = "t_ID") %>%
+  select(t_ID, everything())
+
+conf_m <- full_m_aug %>% 
+  count(genre, pred_gen, .drop = FALSE) %>%
+  pivot_wider(names_from = pred_gen, values_from = n)
+```
+```{r}
+glimpse(full_m_aug)
+```
+
+```{r}
+
+ 
+
+nbins <- sqrt(nrow(full_m_aug))
+
+arm::binnedplot(x = full_m_aug$classical, y = full_m_aug$resid.classical,
+                xlab = "Predicted Probabilities", 
+                main = "Binned Residual vs. Predicted Values", 
+                col.int = FALSE)
+
+arm::binnedplot(x = full_m_aug$edm_dance, y = full_m_aug$resid.edm_dance,
+                xlab = "Predicted Probabilities", 
+                main = "Binned Residual vs. Predicted Values", 
+                col.int = FALSE)
+
+arm::binnedplot(x = full_m_aug$country, y = full_m_aug$resid.country,
+                xlab = "Predicted Probabilities", 
+                main = "Binned Residual vs. Predicted Values", 
+                col.int = FALSE)
+
+arm::binnedplot(x = full_m_aug$other, y = full_m_aug$resid.other,
+                xlab = "Predicted Probabilities", 
+                main = "Binned Residual vs. Predicted Values", 
+                col.int = FALSE)
+
+
+arm::binnedplot(x = full_m_aug$other, y = full_m_aug$resid.other,
+                xlab = "Predicted Probabilities", 
+                main = "Binned Residual vs. Predicted Values", 
+                col.int = FALSE)
+
+
+
+```
+
