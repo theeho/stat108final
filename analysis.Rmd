@@ -16,18 +16,41 @@ library(RColorBrewer)
 library(knitr)
 library(patchwork)
 ```
+RESEARCH QUESTION/DESCRIPTION OF DATA AND RESPONSE: 
+
+Humans can infer the genre of a song based on its audio features. That is, it is pretty easy for humans to understand the difference between a rock song and a classical song. Thus there must be some relationship between the audio features of a song and its genre. For computers, this task is much more trivial because it requires inferring the human perceptible audio features of a song based on a very high dimensional space (audio files are represented by long lists of numbers in computers). Spotify has algorithms which are designed to quantify human perceptible audio features.  
+
+This statistical analysis is designed to model and predict the genre of a Spotify track (response) based on its audio feature values (predictors) that are determined by Spotify algorithms. Based on the assumption that a songs genre is defined by its human perceptible audio features, if we find evidence that a relationship exists between Spotify's audio features and a genre, then this would be evidence to support that Spotify's audio features capture the human perception of audio. 
+
+An important note is that we cannot assume all human perceptible musical features are dependent on genre. 
+
+
+Response: The response is a categorical variable describing the genre of a track. The genre of a track is determined by Spotify and was retreived through the Spotify API for this dataset. The genres of this dataset include classical, electronic dance music (edm_dance), country, hip-hop, metal, punk, pop, and rock. Each track in the data set is ascociated with one genre through the variable "genre". 
+It is important to note that these are not all the genres of Spotify tracks. Spotify only allows an API user to retreive a subset of the genres. I selected these genres based on what I determined to be "popular" and mainstream. 
+
+Predictor variables: The predictor varibles are features desrcribing different audio characteristics of a song. These audo characteristic features of a track are determined by spotify and was retreived through the Spotify API for this dataset. The audio features in this dataset include danceability, energy, key, loudness, mode, speechiness, acousticness, intrumentalness, liveness, valence, tempo, track duration (duration_ms), and time signature (time_signature). These are the varaibles which will be used as predictor variables for a track genre. For more detailed information on the predictors, see the "README" file in the data folder. 
+
+
+EXPLORITY DATA ANALYSIS
 ```{r}
 track_data <- read.csv('data/spotify_tracksV2.csv')
 track_data <- track_data %>% mutate(duration_ms = duration_ms / 1000) %>% filter_all(any_vars(! is.na(.)))
 track_data <- rename(track_data,duration_sec = duration_ms)
 ```
 
+First we parse the data and do a bit of cleaning. We want to convert the duration from milliseconds to seconds so it is more readable. We also want to remove any observations with missing values. An observation may have missing values if the API response timed out during the data scraping. Therfor I determined that a missing value for an observation is indepednent from any of the variables in the dataset and can be safely removed from the dataset. 
+
+
+data_fill_fac is just mutating to factor variables. 
 ```{r}
 data_fill_fac <- track_data %>% filter_all(any_vars(! is.na(.))) %>% mutate(genre = as.factor(genre)) %>% mutate(key = as.factor(key)) %>% mutate(mode = as.factor(mode)) %>% mutate(t_ID = row_number())
 ```
 
+EDA RESPONSE VARIABLE:
+
+Next we plot the distribution of the resposne, the track genre. 
 ```{r}
-p_genre <- ggplot(data_fill_fac, aes(x=genre)) + geom_bar() + labs (y = "count", x = "track genre",
+p_genre <- ggplot(track_data, aes(x=genre)) + geom_bar() + labs (y = "count", x = "track genre",
                                                             title = "number of tracks per genre")
 p_genre
 
@@ -35,6 +58,14 @@ p_genre
 
 
 ```
+We can observe that there is a relatively high amount of observations with the genre rock, classical, edm_dance. Obervations with country, hip-hop and metal genres, have a smaller amount of observations and observations with pop and punk genres have very few observations compared to the rest. This would pose an issue when conducting a multinomial analsysis because there is a lot of variation in the genre counts. Particularly, the model would have a difficult time predicting pop and punk genres. 
+
+Furthermore, having 8 response categories is generally poor practice for multinomial modeling as multinomial modeling is not complex enough to perform accurate predictions for more than 5 response categories. 
+
+Because of this, we should mutate our response varaible to have 5 or less more equally distributed  categories. 
+
+
+
 ```{r}
 
 
@@ -55,8 +86,14 @@ p_g2 <- ggplot(g2, aes(x=genre)) + geom_bar() + labs (y = "count", x = "track ge
 p_g1 + p_g2 
 
 ```
+The choose to create two more dataframes for seperate analysis. The first one called "g1" in the code does not change observations with classical, country, edm_dance, or rock genres but combines obsevations with all other genres into a new category for genre called "other". We can observe that this dataframe has a much more equal distribution of genres and only has 5 categories. This is a much better response for a multinomial model. However, we can still observe that there is still much less observations with country as the genre. 
+
+In the second dataframe called "g2" in the code we drop observations with country genre to make an equal distribution of genre counts. We can observe from the bar graph that this creates a very even amount of genres across the dataset. However, this choice is questionable because we are loosing information by dropping these values. Therefor I will first conduct analysis with "g1" and only consider using "g2" if I find that the multinomial model of "g1" is failing due to the lack of observations with country as the genre. I may also create another data frame like "g2" only instead of dropping country I add it to the "other" genre. This may be a better choice because it avoids loosing information. 
 
 
+EDA PREDICTOR VARIABLES:
+
+Lets plot all continuous predictor variables. 
 
 ```{r}
 
@@ -93,7 +130,7 @@ p_tempo <- ggplot(data_fill_fac, aes(x=tempo)) + geom_histogram() +
   labs(y = "count", x = "track tempo",
        title = "tempo distribution")
 
-p_duration <- ggplot(data_fill_fac, aes(x=duration_ms)) + geom_histogram() + 
+p_duration <- ggplot(data_fill_fac, aes(x=duration_sec)) + geom_histogram() + 
   labs(y = "count", x = "track duration (MS)",
        title = "duration distribution")
 
@@ -103,6 +140,10 @@ p_valence + p_tempo + p_duration
 
 summary(data_fill_fac)
 ```
+We can observe a wide range of distributions for the predictor variables. Some predictors like danceability and tempo seem to roughly follow a normal distribution. Acousticness however seems to roughly follow a bimodal distribution. Some plots, particularly the speechiness plot do not show a lot of variation. It seems the vast majority of observations have a speechiness of around 0. 
+
+
+EDA CONTINOUS PREDICTORS VS GENRE
 ```{r}
 
 bg1_dance <- ggplot(g1, aes(genre, danceability)) + geom_boxplot() +labs (title = "danceability per genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
@@ -129,6 +170,11 @@ bg1_speech + bg1_acoust + bg1_live
 bg1_val + bg1_tempo + bg1_dur
 
 ```
+Here we plotted the continous predictor values per genre. Speechiness liveness and duration do not show that much variability between genres. Another interesting thing is that classical has a much different median for many of the predictors. This may suggest that classical would be a good baseline category. The most promising predictors based on these plots seem to be energy and danceability based on their variation between genres.
+
+
+
+
 ```{r}
 g_clas <- g1 %>% filter(genre == "classical" )
 g_country <- g1 %>% filter(genre == "country" )
@@ -155,28 +201,35 @@ pkey_clas + pkey_country
 pkey_edm + pkey_rock + pkey_other
 
 ```
+EDA INDEPEDNENT COVARIATES
 
-```{r}
-glimpse(track_data)
-```
-
+Lets next determine if there are any possible covariates that are dependent from eachother. To do this, we will create a linear correlation plot of the continuous predictor variables. 
 
 
 ```{r}
 ntype_data <- subset(track_data, select = -c(track.name, artists.names, artists.ids, artist.ids, track.id, release.date, type, id, time_signature, follow, pop, num.artist, genre, mode, key))
 corrplot(cor(ntype_data))
 ```
+We can observe that for the most part, there is not much correlation between predictor variables. However, acousticness appears to be highly correlated with energy and loudness. This may cause noise in our model. However, before determining if I should drop any predictor variables I should use an ANOVA test. This correlation plot suggests that I may want to run an anova test without acousticness in the reduced model. 
+
+
+MODELING: 
+
+Finally, lets create a multinomial model with all original predictor variables. 
 ```{r}
 g1 <- g1 %>%  mutate(genre = as.factor(genre)) %>% mutate(key = as.factor(key)) %>% mutate(mode = as.factor(mode)) %>% mutate(t_ID = row_number())
 
 
-full_model <- multinom(genre ~ danceability + energy + loudness + speechiness + acousticness + instrumentalness + liveness + valence + tempo + duration_sec, data = g1)
+full_model <- multinom(genre ~ danceability + energy + loudness + speechiness + acousticness + instrumentalness + liveness + valence + tempo + duration_sec + key + mode, data = g1)
 tidy(full_model, conf.int = TRUE, exponentiate = FALSE) %>%
   kable(digits = 3, format = "markdown")
 ```
-```{r}
 
-```
+We can observe that some paramaters have a high p value particularly ones that are ascociated with key. This may be an example of an audio feature that does not determine the genre of a song. Based on the context of the problem, this is not unreasonable because it is difficult for humans to differ a tracks genre based on its key. 
+
+If I told you a track was very "danceable", you would probably think that it is more likely for the track to belong to the electronic dance music genre than the classical genre. This is reflected in the model which shows that the danceability of a track increases its log odds of being an electronic dance music track as oppose to a classical track by 14.31 
+
+Aside from the key, another alarmingly large p-value is the tempo. Particularly, in country and rock. Other response categories have a much lower p-value for tempo, however confidence interval is close to 0. 
 
 
 
@@ -209,10 +262,10 @@ full_m_aug <- inner_join(full_m_aug, residuals, by = "t_ID") %>%
 conf_m <- full_m_aug %>% 
   count(genre, pred_gen, .drop = FALSE) %>%
   pivot_wider(names_from = pred_gen, values_from = n)
+
+conf_m
 ```
-```{r}
-glimpse(full_m_aug)
-```
+
 
 ```{r}
 
@@ -222,31 +275,113 @@ nbins <- sqrt(nrow(full_m_aug))
 
 arm::binnedplot(x = full_m_aug$classical, y = full_m_aug$resid.classical,
                 xlab = "Predicted Probabilities", 
-                main = "Binned Residual vs. Predicted Values", 
+                main = "CLASSICAL: Binned Residual vs. Predicted Values", 
                 col.int = FALSE)
 
 arm::binnedplot(x = full_m_aug$edm_dance, y = full_m_aug$resid.edm_dance,
                 xlab = "Predicted Probabilities", 
-                main = "Binned Residual vs. Predicted Values", 
+                main = "EDM_DANCE: Binned Residual vs. Predicted Values", 
                 col.int = FALSE)
 
 arm::binnedplot(x = full_m_aug$country, y = full_m_aug$resid.country,
                 xlab = "Predicted Probabilities", 
-                main = "Binned Residual vs. Predicted Values", 
+                main = "COUNTRY: Binned Residual vs. Predicted Values", 
                 col.int = FALSE)
 
 arm::binnedplot(x = full_m_aug$other, y = full_m_aug$resid.other,
                 xlab = "Predicted Probabilities", 
-                main = "Binned Residual vs. Predicted Values", 
+                main = "OTHER: Binned Residual vs. Predicted Values", 
                 col.int = FALSE)
 
 
-arm::binnedplot(x = full_m_aug$other, y = full_m_aug$resid.other,
+arm::binnedplot(x = full_m_aug$rock, y = full_m_aug$resid.rock,
                 xlab = "Predicted Probabilities", 
-                main = "Binned Residual vs. Predicted Values", 
+                main = "ROCK: Binned Residual vs. Predicted Values", 
                 col.int = FALSE)
 
 
+
+```
+```{r}
+
+full_m_aug_rock <- full_m_aug %>% filter(genre == "rock")
+nbins <- sqrt(nrow(full_m_aug_rock))
+arm::binnedplot(x = full_m_aug_rock$acousticness, y = full_m_aug_rock$resid.rock,
+                xlab = "Acousticness", 
+                main = "ROCK: Binned Residual vs. Acousticness Feature", 
+                col.int = FALSE)
+
+full_m_aug_class <- full_m_aug %>% filter(genre == "classical")
+nbins <- sqrt(nrow(full_m_aug_class))
+arm::binnedplot(x = full_m_aug_class$acousticness, y = full_m_aug_class$resid.classical,
+                xlab = "Acousticness", 
+                main = "CLASICAL: Binned Residual vs. Acousticness Feature", 
+                col.int = FALSE)
+
+full_m_aug_edm <- full_m_aug %>% filter(genre == "edm_dance")
+nbins <- sqrt(nrow(full_m_aug_edm))
+arm::binnedplot(x = full_m_aug_edm$acousticness, y = full_m_aug_edm$resid.edm_dance,
+                xlab = "Acousticness", 
+                main = "EDM_DANCE: Binned Residual vs. Acousticness Feature", 
+                col.int = FALSE)
+
+full_m_aug_other <- full_m_aug %>% filter(genre == "other")
+nbins <- sqrt(nrow(full_m_aug_other))
+arm::binnedplot(x = full_m_aug_other$acousticness, y = full_m_aug_other$resid.other,
+                xlab = "Acousticness", 
+                main = "OTHER: Binned Residual vs. Acousticness Feature", 
+                col.int = FALSE)
+
+full_m_aug_country <- full_m_aug %>% filter(genre == "country")
+nbins <- sqrt(nrow(full_m_aug_country))
+arm::binnedplot(x = full_m_aug_country$acousticness, y = full_m_aug_country$resid.country,
+                xlab = "Acousticness", 
+                main = "COUNTRY: Binned Residual vs. Acousticness Feature", 
+                col.int = FALSE)
+```
+```{r}
+full_m_aug_rock <- full_m_aug %>% filter(genre == "rock")
+nbins <- sqrt(nrow(full_m_aug_rock))
+arm::binnedplot(x = full_m_aug_rock$liveness, y = full_m_aug_rock$resid.rock,
+                xlab = "Acousticness", 
+                main = "ROCK: Binned Residual vs. Acousticness Feature", 
+                col.int = FALSE)
+
+full_m_aug_class <- full_m_aug %>% filter(genre == "classical")
+nbins <- sqrt(nrow(full_m_aug_class))
+arm::binnedplot(x = full_m_aug_class$liveness, y = full_m_aug_class$resid.classical,
+                xlab = "Acousticness", 
+                main = "CLASICAL: Binned Residual vs. Acousticness Feature", 
+                col.int = FALSE)
+
+full_m_aug_edm <- full_m_aug %>% filter(genre == "edm_dance")
+nbins <- sqrt(nrow(full_m_aug_edm))
+arm::binnedplot(x = full_m_aug_edm$liveness, y = full_m_aug_edm$resid.edm_dance,
+                xlab = "Acousticness", 
+                main = "EDM_DANCE: Binned Residual vs. Acousticness Feature", 
+                col.int = FALSE)
+
+full_m_aug_other <- full_m_aug %>% filter(genre == "other")
+nbins <- sqrt(nrow(full_m_aug_other))
+arm::binnedplot(x = full_m_aug_other$liveness, y = full_m_aug_other$resid.other,
+                xlab = "Acousticness", 
+                main = "OTHER: Binned Residual vs. Acousticness Feature", 
+                col.int = FALSE)
+
+full_m_aug_country <- full_m_aug %>% filter(genre == "country")
+nbins <- sqrt(nrow(full_m_aug_country))
+arm::binnedplot(x = full_m_aug_country$danceability, y = full_m_aug_country$resid.country,
+                xlab = "Acousticness", 
+                main = "COUNTRY: Binned Residual vs. Acousticness Feature", 
+                col.int = FALSE)
+```
+```{r}
+full_model_key <- multinom(genre ~ danceability + energy + loudness + speechiness + acousticness + instrumentalness + liveness + valence + tempo + duration_sec + key, data = g1)
+
+red_model <- multinom(genre ~ danceability + energy + loudness + speechiness  + instrumentalness + liveness + valence + tempo  + acousticness, data = g1)
+
+anova(red_model, full_model, test = "Chisq") %>%
+  kable(format = "markdown")
 
 ```
 
