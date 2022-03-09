@@ -22,13 +22,13 @@ Humans can infer the genre of a song based on its audio features. That is, it is
 
 This statistical analysis is designed to model and predict the genre of a Spotify track (response) based on its audio feature values (predictors) that are determined by Spotify algorithms. Based on the assumption that a songs genre is defined by its human perceptible audio features, if we find evidence that a relationship exists between Spotify's audio features and a genre, then this would be evidence to support that Spotify's audio features capture the human perception of audio. 
 
-An important note is that we cannot assume all human perceptible musical features are dependent on genre. 
+An important note is that we cannot assume all human perceptible musical features are dependent on genre. This project assumes some of the audio features included in the dataset are measures of human percptible musical features which are dependednt on genres.
 
 
 Response: The response is a categorical variable describing the genre of a track. The genre of a track is determined by Spotify and was retreived through the Spotify API for this dataset. The genres of this dataset include classical, electronic dance music (edm_dance), country, hip-hop, metal, punk, pop, and rock. Each track in the data set is ascociated with one genre through the variable "genre". 
 It is important to note that these are not all the genres of Spotify tracks. Spotify only allows an API user to retreive a subset of the genres. I selected these genres based on what I determined to be "popular" and mainstream. 
 
-Predictor variables: The predictor varibles are features desrcribing different audio characteristics of a song. These audo characteristic features of a track are determined by spotify and was retreived through the Spotify API for this dataset. The audio features in this dataset include danceability, energy, key, loudness, mode, speechiness, acousticness, intrumentalness, liveness, valence, tempo, track duration (duration_ms), and time signature (time_signature). These are the varaibles which will be used as predictor variables for a track genre. For more detailed information on the predictors, see the "README" file in the data folder. 
+Predictor variables: The predictor varibles are features desrcribing different audio characteristics of a song. These audo characteristic features of a track are determined by spotify and was retreived through the Spotify API for this dataset. The audio features in this dataset include danceability, energy, key, loudness, mode, speechiness, acousticness, intrumentalness, liveness, valence, tempo, track duration (duration_ms), and time signature (time_signature). These are the varaibles which will be used as predictor variables for a track genre. For more detailed information on the predictors, see the "README" file in the data folder. It would be very useful to understand more about how these audio feature measures were calculated and the techincal details toSpotify's algorithms but I could not find any documentation on this. 
 
 
 EXPLORITY DATA ANALYSIS
@@ -143,6 +143,8 @@ summary(data_fill_fac)
 We can observe a wide range of distributions for the predictor variables. Some predictors like danceability and tempo seem to roughly follow a normal distribution. Acousticness however seems to roughly follow a bimodal distribution. Some plots, particularly the speechiness plot do not show a lot of variation. It seems the vast majority of observations have a speechiness of around 0. 
 
 
+
+
 EDA CONTINOUS PREDICTORS VS GENRE
 ```{r}
 
@@ -173,7 +175,7 @@ bg1_val + bg1_tempo + bg1_dur
 Here we plotted the continous predictor values per genre. Speechiness liveness and duration do not show that much variability between genres. Another interesting thing is that classical has a much different median for many of the predictors. This may suggest that classical would be a good baseline category. The most promising predictors based on these plots seem to be energy and danceability based on their variation between genres.
 
 
-
+[TODO: EDA ON CATEGORICAL PREDICTORS]
 
 ```{r}
 g_clas <- g1 %>% filter(genre == "classical" )
@@ -225,11 +227,33 @@ tidy(full_model, conf.int = TRUE, exponentiate = FALSE) %>%
   kable(digits = 3, format = "markdown")
 ```
 
-We can observe that some paramaters have a high p value particularly ones that are ascociated with key. This may be an example of an audio feature that does not determine the genre of a song. Based on the context of the problem, this is not unreasonable because it is difficult for humans to differ a tracks genre based on its key. 
+KEY:
+
+We can observe that some paramaters have a high p value particularly ones that are ascociated with key. If a tracks key is not useful for humans to determine a songs track, then this model accurately reflects that. However, if a tracks key can be used by humans to help determine the genre, then this is either an inaccuracy in the model, the data, or Spotify's alrgorithim for determining a tracks key. 
+
+Looking at the key more closely, we can see that the genres of other, rock, and edm_dance have a low p-value for key6. Key 6 correspondes to the key of f-sharp. Maybe this would be a good place to ask an expert in the field to interpret why a key6 would have a low p value for edm_dance, other, and rock. 
+
+From my understanding of music theory, a key is the set of notes used in the song determined by the base note and whether the song is major or minor. However, Spotify's key feature only is the base note and does not include whether it is major or minor. The Spotify's key feature would more accurately be named "picth class". It is important to consider this when interpreting the key feature.  
+See https://developer.spotify.com/documentation/web-api/reference/#/operations/get-several-audio-features
+
+
+DANCEABLE:
 
 If I told you a track was very "danceable", you would probably think that it is more likely for the track to belong to the electronic dance music genre than the classical genre. This is reflected in the model which shows that the danceability of a track increases its log odds of being an electronic dance music track as oppose to a classical track by 14.31 
 
-Aside from the key, another alarmingly large p-value is the tempo. Particularly, in country and rock. Other response categories have a much lower p-value for tempo, however confidence interval is close to 0. 
+TEMPO: 
+
+Aside from the key, another alarmingly large p-value is the tempo. Particularly, in country and rock. Other response categories have a much lower p-value for tempo, however the confidence interval is close to 0. If tempo is independent from genre then this model accurately reflects this. However, if tempo is dependent on a songs genre then there is either an issue with the model, the data, or Spotify's algorithm for determining tempo. 
+
+
+SPEECHINESS:
+
+There is also some interesting model outputs for speechiness. For some genres, speechiness is behaving like we would generall expect it to. Specifically, the other and edm_dance genres have low p-values with confidence intervals far from 0. This is what we would expect because classical tracks should have relatively very low levels of speech. 
+
+However, according to the model a higher speechiness value correlates to a higher liklehood that a given track is of the classical genre as oppose to the country genre. The p value is low and confidence interval far from 0 for this paramater. 
+
+
+
 
 
 
@@ -344,44 +368,36 @@ full_m_aug_rock <- full_m_aug %>% filter(genre == "rock")
 nbins <- sqrt(nrow(full_m_aug_rock))
 arm::binnedplot(x = full_m_aug_rock$liveness, y = full_m_aug_rock$resid.rock,
                 xlab = "Acousticness", 
-                main = "ROCK: Binned Residual vs. Acousticness Feature", 
+                main = "ROCK: Binned Residual vs. Danceability Feature", 
                 col.int = FALSE)
 
 full_m_aug_class <- full_m_aug %>% filter(genre == "classical")
 nbins <- sqrt(nrow(full_m_aug_class))
 arm::binnedplot(x = full_m_aug_class$liveness, y = full_m_aug_class$resid.classical,
                 xlab = "Acousticness", 
-                main = "CLASICAL: Binned Residual vs. Acousticness Feature", 
+                main = "CLASICAL: Binned Residual vs. Danceability Feature", 
                 col.int = FALSE)
 
 full_m_aug_edm <- full_m_aug %>% filter(genre == "edm_dance")
 nbins <- sqrt(nrow(full_m_aug_edm))
 arm::binnedplot(x = full_m_aug_edm$liveness, y = full_m_aug_edm$resid.edm_dance,
                 xlab = "Acousticness", 
-                main = "EDM_DANCE: Binned Residual vs. Acousticness Feature", 
+                main = "EDM_DANCE: Binned Residual vs. Danceability Feature", 
                 col.int = FALSE)
 
 full_m_aug_other <- full_m_aug %>% filter(genre == "other")
 nbins <- sqrt(nrow(full_m_aug_other))
 arm::binnedplot(x = full_m_aug_other$liveness, y = full_m_aug_other$resid.other,
                 xlab = "Acousticness", 
-                main = "OTHER: Binned Residual vs. Acousticness Feature", 
+                main = "OTHER: Binned Residual vs. Danceability Feature", 
                 col.int = FALSE)
 
 full_m_aug_country <- full_m_aug %>% filter(genre == "country")
 nbins <- sqrt(nrow(full_m_aug_country))
 arm::binnedplot(x = full_m_aug_country$danceability, y = full_m_aug_country$resid.country,
                 xlab = "Acousticness", 
-                main = "COUNTRY: Binned Residual vs. Acousticness Feature", 
+                main = "COUNTRY: Binned Residual vs. Danceability Feature", 
                 col.int = FALSE)
 ```
-```{r}
-full_model_key <- multinom(genre ~ danceability + energy + loudness + speechiness + acousticness + instrumentalness + liveness + valence + tempo + duration_sec + key, data = g1)
 
-red_model <- multinom(genre ~ danceability + energy + loudness + speechiness  + instrumentalness + liveness + valence + tempo  + acousticness, data = g1)
-
-anova(red_model, full_model, test = "Chisq") %>%
-  kable(format = "markdown")
-
-```
 
