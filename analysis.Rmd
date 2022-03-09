@@ -177,32 +177,27 @@ Here we plotted the continous predictor values per genre. Speechiness liveness a
 
 [TODO: EDA ON CATEGORICAL PREDICTORS]
 
+
 ```{r}
-g_clas <- g1 %>% filter(genre == "classical" )
-g_country <- g1 %>% filter(genre == "country" )
-g_edm <- g1 %>% filter(genre == "edm_dance" )
-g_rock <- g1 %>% filter(genre == "rock" )
-g_other <- g1 %>% filter(genre == "other" )
+pgm <- ggplot(data = g1, aes(x = genre, fill = mode)) +
+  geom_bar(position = "fill") +
+  labs(y = "Proportion", 
+       title = "Genre vs Mode") +
+  coord_flip()
 
-pkey_clas <- ggplot(g_clas, aes(x=key)) + geom_bar() + labs (y = "count", x = "track key",
-                                                            title = "number of classical tracks per key")
+pgk <- ggplot(data = g1, aes(x = genre, fill = key)) +
+  geom_bar(position = "fill") +
+  labs(y = "Proportion", 
+       title = "Genre vs Key") +
+  coord_flip()
 
-pkey_country <- ggplot(g_country, aes(x=key)) + geom_bar() + labs (y = "count", x = "track key",
-                                                            title = "number of country tracks per key")
-
-pkey_edm <- ggplot(g_edm, aes(x=key)) + geom_bar() + labs (y = "count", x = "track key",
-                                                            title = "number of edm tracks per key")
-
-pkey_rock <- ggplot(g_rock, aes(x=key)) + geom_bar() + labs (y = "count", x = "track key",
-                                                            title = "number of rock tracks per key")
-
-pkey_other <- ggplot(g_other, aes(x=key)) + geom_bar() + labs (y = "count", x = "track key",
-                                                            title = "number of other tracks per key")
-
-pkey_clas + pkey_country
-pkey_edm + pkey_rock + pkey_other
-
+pgk 
+pgm
 ```
+
+
+
+
 EDA INDEPEDNENT COVARIATES
 
 Lets next determine if there are any possible covariates that are dependent from eachother. To do this, we will create a linear correlation plot of the continuous predictor variables. 
@@ -400,4 +395,44 @@ arm::binnedplot(x = full_m_aug_country$danceability, y = full_m_aug_country$resi
                 col.int = FALSE)
 ```
 
+```{r}
+red_model <- multinom(genre ~ danceability + loudness + speechiness + acousticness + instrumentalness + liveness + valence  + duration_sec + tempo + mode + energy, data = g1)
+
+anova(red_model, full_model, test = "Chisq") %>%
+  kable(format = "markdown")
+```
+```{r}
+sfm1 <- step(full_model)
+summary(sfm1)
+```
+```{r}
+srm1 <- step(red_model)
+summary(srm1)
+```
+```{r}
+g1_c_keymode <- g1 %>% mutate(key = as.factor((ifelse(mode == 0, as.numeric(key) * 2, as.numeric(key) * 2 + 1 ))))
+glimpse(g1_c_keymode)
+```
+```{r}
+keymode_model <- multinom(genre ~ danceability + energy + loudness + speechiness + acousticness + instrumentalness + liveness + valence + tempo + duration_sec + key + mode, data = g1_c_keymode)
+
+red_keymode1 <- multinom(genre ~ danceability + energy + loudness + speechiness + acousticness + instrumentalness + liveness + valence + tempo + duration_sec + key, data = g1_c_keymode)
+```
+
+
+```{r}
+anova(red_keymode1, keymode_model, test = "Chisq") %>%
+  kable(format = "markdown")
+```
+
+
+
+```{r}
+srm1 <- step(keymode_model)
+summary(srm1)
+```
+```{r}
+attributes(logLik(red_keymode1))
+
+```
 
