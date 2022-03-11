@@ -43,7 +43,7 @@ First we parse the data and do a bit of cleaning. We want to convert the duratio
 
 data_fill_fac is just mutating to factor variables. 
 ```{r}
-data_fill_fac <- track_data %>% filter_all(any_vars(! is.na(.))) %>% mutate(genre = as.factor(genre)) %>% mutate(key = as.factor(key)) %>% mutate(mode = as.factor(mode)) %>% mutate(t_ID = row_number())
+track_data <- track_data %>% filter_all(any_vars(! is.na(.))) %>% mutate(genre = as.character.factor(genre)) %>% mutate(key = as.factor(key)) %>% mutate(mode = as.factor(mode)) %>% mutate(t_ID = row_number())
 ```
 
 EDA RESPONSE VARIABLE:
@@ -410,7 +410,8 @@ srm1 <- step(red_model)
 summary(srm1)
 ```
 ```{r}
-g1_c_keymode <- g1 %>% mutate(key = as.factor((ifelse(mode == 0, as.numeric(key) * 2, as.numeric(key) * 2 + 1 ))))
+g1_c_keymode <- g1 %>% mutate(key = (ifelse(mode == 0, as.numeric(key) * 2, as.numeric(key) * 2 + 1 )))
+g1_c_keymode <- g1_c_keymode %>% mutate(key = as.factor(key))
 glimpse(g1_c_keymode)
 ```
 ```{r}
@@ -428,11 +429,42 @@ anova(red_keymode1, keymode_model, test = "Chisq") %>%
 
 
 ```{r}
-srm1 <- step(keymode_model)
+srm1 <- step(red_keymode1)
 summary(srm1)
 ```
 ```{r}
 attributes(logLik(red_keymode1))
 
+```
+```{r}
+tidy(red_keymode1, conf.int = TRUE, exponentiate = FALSE) %>%
+  kable(digits = 3, format = "markdown")
+```
+
+```{r}
+pred_probs <- as_tibble(predict(red_keymode1, type = "probs")) %>% 
+                        mutate(t_ID = 1:n()) 
+
+redk_m_aug <- inner_join(g1, pred_probs, 
+                           by = "t_ID") %>%
+  select(t_ID, everything())
+
+redk_m_aug <- redk_m_aug %>% 
+  mutate(pred_gen = predict(red_keymode1, type = "class"))
+
+residuals <- as_tibble(residuals(red_keymode1)) %>%  #calculate residuals
+  setNames(paste('resid.', names(.), sep = "")) %>% #update column names
+  mutate(t_ID = 1:n()) #add obs number
+
+
+redk_m_aug <- inner_join(redk_m_aug, residuals, by = "t_ID") %>%
+  select(t_ID, everything())
+
+conf_m1 <- redk_m_aug %>% 
+  count(genre, pred_gen, .drop = FALSE) %>%
+  pivot_wider(names_from = pred_gen, values_from = n)
+
+conf_m1
+conf_m
 ```
 
