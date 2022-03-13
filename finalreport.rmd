@@ -1,0 +1,232 @@
+---
+title: "Using Spotify Audio Features to Model Track Genre"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+
+
+```
+```{r, include = FALSE}
+library(tidyverse)
+library(knitr)
+library(corrplot)
+library(patchwork)
+library(PerformanceAnalytics)
+```
+
+# Introduction
+
+
+ Humans can infer the genre of a song based on its audio features. That is, it is pretty easy for humans to understand the difference between a rock song and a classical song. Thus there must be some relationship between the audio features of a song and its genre. For computers, this task is much more trivial because it requires inferring the human perceptible audio features of a song based on a very high dimensional space as audio files are represented by long lists of numbers in computers.
+
+  Spotify has algorithms which are designed to quantify human perceptible audio features such as "danceability" and "loudness". But how well do these algorithms capture the human perception of music? Can these computed features be used to infer the genre of a song? 
+
+ This statistical analysis is designed to model and predict the genre of a Spotify track (response) using mulitnomial logistic regression based on its audio feature values (predictors) that are determined by Spotify algorithms. Based on the assumption that a songs genre is defined by its human perceptible audio features, if we find evidence that a relationship exists between Spotify's audio features and a genre, then this would be evidence to support that Spotify's audio features capture the human perception of audio. 
+
+  An important note is that we cannot assume all human perceptible musical features are dependent on genre. This project assumes some of the audio features included in the dataset are measures of human percptible musical features which are dependent on genres.
+
+## Data
+The dataset includes 6588 tracks with variables such as audio features and track genre. The dataset also includes information non-audio information about the track such as release date, artists names, and track name. However, this model is only concerned with audio features and genre. 
+
+The response is a categorical variable string of the tracks genre. The original dataset contains 8 genres; classical, electronic dance music (edm), country, hip-hop, metal, punk, pop, and rock.
+
+
+There are 11 total predictor variables which describe different audio features of the track. See Figure 1 for the names, variable type, and a description of the audio features provided by the Spotify API that are used as predictor variables for this model. 
+
+The dataset was scraped using Spotify's API with a python script. The script used Spotipy, a Python library for Spotify API calls. The script first retrieved a list of genres from the API. Then it retrieved a list of playlists from each genre and the tracks for each of the playlists. Duplicate tracks were removed in the script by removing tracks which had the same track name and artist ids. Spotify's API only allows for a limited number of genres and playlists to be retrieved by the API user.
+
+\break
+
+\textbf{Figure 1} 
+\newline 
+Predictor Variables
+\renewcommand{\arraystretch}{2}
+\begin{table}[!htbp]
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Variable Name} & \textbf{Type} & \textbf{Description}                                                              \\ \hline
+acousticness           & float         & A confidence measure from 0.0 to 1.0 of whether the track is acoustic.            \\ \hline
+danceability           & float         & A value from 0.0 to 1.0 describing how suitable a track is for dancing.           \\ \hline
+duration\_ms           & integer       & The duration of the track in milliseconds.                                        \\ \hline
+energy                 & float         & A measure from 0.0 to 1.0 and represents a measure of intensity and activity.     \\ \hline
+instrumentalness       & float         & A confidence measure from 0.0 to 1.0 of whether a track contains no vocals.       \\ \hline
+key                    & integer       & The key the track is in as an integer in Pitch Class notation.                    \\ \hline
+liveness               & float         & A confidence measure from 0.0 to 1.0 of whether the track contains live audience. \\ \hline
+loudness               & float         & The overall loudness of a track in decibels (dB).                                 \\ \hline
+mode                   & integer       & Indicates the modality. Major is represented by 1 and minor is 0.                 \\ \hline
+speechiness            & float         & A measure from 0.0 to 1.0 of the presence of spoken words in a track.             \\ \hline
+tempo                  & float         & The overall estimated tempo of a track in beats per minute (BPM).                 \\ \hline
+time\_signature        & integer       & An estimated time signature.                                                      \\ \hline
+valence                & float         & A measure from 0.0 to 1.0 describing the musical positiveness conveyed by a track \\ \hline
+\end{tabular}
+\end{table}
+
+## References
+
+\href{https://colab.research.google.com/drive/1VIpipujOuut-qT1iVkMw8lASIqxjEGDv?usp=sharing}{\color{blue}Data Sraping Script} 
+
+\href{https://developer.spotify.com/documentation/web-api/}{\color{blue}Spotify API Reference}
+
+
+Towards Data Science published an \href{https://towardsdatascience.com/song-popularity-predictor-1ef69735e380}{\color{blue}article} describing several modeling approaches to predict whether a Spotify track will be on Spotify's Top 100 billboard using similar predictor variables.
+
+
+## Exploritory Data Analysis 
+
+```{r}
+track_data <- read.csv('data/spotify_tracksV2.csv')
+track_data <- track_data %>% mutate(genre = ifelse(genre == "edm_dance", "edm", genre))
+track_data <- track_data %>% mutate(duration_ms = duration_ms / 1000) %>% filter_all(any_vars(! is.na(.))) %>% mutate(genre = as.factor(genre)) %>% mutate(key = as.factor(key)) %>% mutate(mode = as.factor(mode)) %>% mutate(t_ID = row_number())
+track_data <- rename(track_data,duration_sec = duration_ms)
+
+```
+```{r}
+track_data <- track_data %>% mutate(genre = as.character(genre))
+```
+
+```{r, fig.height = 6}
+p_genre <- ggplot(track_data, aes(x=genre)) + geom_bar() + labs (y = "Count", x = "Track Genre",
+                                                            title = "Number of Tracks per Genre") + theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1), plot.title = element_text(hjust = 0.5))
+
+g1 <- track_data %>% mutate(genre = ifelse(genre == "hiphop", "other", ifelse(genre == "metal", "other", (ifelse(genre == "pop", "other", (ifelse(genre == "punk", "other", genre)))))))
+
+p_g1 <- ggplot(g1, aes(x=genre)) + geom_bar() + labs (y = "\nCount", x = "Track Genre",
+                                                            title = "Number of Tracks per \nCombined Genre") + theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1), plot.title = element_text(hjust = 0.5)  )
+p_genre + p_g1
+
+```
+The plot on the left is the raw data containing 8 possible genres. In this plot, there is a lot of variation between the counts for each genre. The plot on the right uses a data frame which combines hip-hop, pop, punk, and metal to one genre called "other". This plot has a much more even distribution of counts and only contains 5 possible genres. Multinomial models perform best with 5 or less response categories and an even distribution of counts for each category. This suggests that the data frame plotted on the right would be a better choice and it will be used for the model instead of the original raw dataset. 
+
+\break
+
+\textbf{Distribution of Predictor Variables}
+
+```{r, echo = FALSE, results='hide', message=FALSE, fig.height = 7}
+
+p_dance <- ggplot(g1, aes(x=danceability)) + geom_histogram() + 
+  labs(y = "\nCount", x = "Danceability",
+       title = "\nDanceability vs Count") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+p_energy <- ggplot(g1, aes(x=energy)) + geom_histogram() + 
+  labs(y = "\nCount", x = "Energy",
+       title = "\nEnergy vs Count") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+p_loud <- ggplot(g1, aes(x=loudness)) + geom_histogram() + 
+  labs(y = "\nCount", x = "Loudness",
+       title = "\nLoudness vs Count ") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+p_speech <- ggplot(g1, aes(x=speechiness)) + geom_histogram() + 
+  labs(y = "\nCount", x = "Speechiness",
+       title = "\nSpeechiness vs Count") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+p_acoustic <- ggplot(g1, aes(x=acousticness)) + geom_histogram() + 
+  labs(y = "\nCount", x = "Acousticness",
+       title = "\nAcousticness vs Count ") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+p_live <- ggplot(g1, aes(x=liveness)) + geom_histogram() + 
+  labs(y = "\nCount", x = "Liveness",
+       title = "\nLiveness vs Count ") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+p_valence <- ggplot(g1, aes(x=valence)) + geom_histogram() + 
+  labs(y = "\nCount", x = "Valence",
+       title = "\nValence vs Count") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+p_tempo <- ggplot(g1, aes(x=tempo)) + geom_histogram() + 
+  labs(y = "\nCount", x = "Track Tempo",
+       title = "\nTempo vs Count") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+p_duration <- ggplot(g1, aes(x=duration_sec)) + geom_histogram() + 
+  labs(y = "\nCount", x = "Track Duration (MS)",
+       title = "\nTrack Duration vs Count") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+p_inst <- ggplot(g1, aes(x=instrumentalness)) + geom_histogram() + 
+  labs(y = "\nCount", x = "Instrumentalness",
+       title = "\nInstrumentalness vs Count") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+p_key <- ggplot(g1, aes(x=key)) + geom_bar() + 
+  labs(y = "\nCount", x = "Key",
+       title = "\nKey vs Count") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+
+p_tsig <- ggplot(g1, aes(x=time_signature)) + geom_bar() + 
+  labs(y = "\nCount", x = "Time Signature",
+       title = "\nTime Signature vs Count") + theme(plot.title = element_text(size=10, hjust = 0.5), axis.title.x = element_text(size = 9), axis.title.y = element_text(size = 9))
+
+p_dance + p_energy + p_loud + p_speech + p_acoustic + p_live+ p_valence + p_tempo + p_duration + p_inst+ p_key + p_tsig + plot_layout(ncol = 3)
+
+
+
+
+```
+
+There is a wide range of distributions for the predictor variables. Some predictors like danceability and tempo seem to roughly follow a normal distribution. Acousticness however seems to roughly follow a bimodal distribution. Some plots, particularly the speechiness plot do not show a lot of variation. It seems the vast majority of observations have a speechiness of around 0. This is expected as it would be rare for a musical track to contain spoken (not sung) words. The time signature plot also indicates that the majority of the tracks are in 4/4 time. This is the widely accepted convention for time signature in modern music. The instrumentalness plot indicates that the majority of the tracks have vocals (sung words).  
+
+\break
+
+\textbf{Continuous Predictors vs Genre} 
+
+```{r, fig.height = 7}
+bg1_dance <- ggplot(g1, aes(genre, danceability)) + geom_boxplot() +labs (title = "\nDanceability per Genre", y = "Danceability", x = "Genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5), axis.title.x = element_text(size = 9), plot.title = element_text(size = 10), axis.title.y = element_text(size = 9))
+
+bg1_energy <- ggplot(g1, aes(genre, energy)) + geom_boxplot() +labs (title = "\nEnergy per  Genre", y = "Energy", x = "Genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.title.x = element_text(size = 9), plot.title = element_text(size = 10), axis.title.y = element_text(size = 9))
+
+bg1_loud <- ggplot(g1, aes(genre, loudness)) + geom_boxplot() +labs (title = "\nLoudness per  Genre", y = "Loudness", x = "Genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.title.x = element_text(size = 9), plot.title = element_text(size = 10), axis.title.y = element_text(size = 9))
+
+bg1_speech <- ggplot(g1, aes(genre, speechiness)) + geom_boxplot() +labs (title = "\nSpeechiness per Genre", y = "Speechiness", x = "Genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.title.x = element_text(size = 9), plot.title = element_text(size = 10), axis.title.y = element_text(size = 9))
+
+bg1_acoust <- ggplot(g1, aes(genre, acousticness)) + geom_boxplot() +labs (title = "\nAcousticness per Genre", y = "Acousticness", x = "Genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.title.x = element_text(size = 9), plot.title = element_text(size = 10), axis.title.y = element_text(size = 9))
+
+bg1_live <- ggplot(g1, aes(genre, liveness)) + geom_boxplot() +labs (title = "\nLiveness per Genre", y = "Liveness", x = "Genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.title.x = element_text(size = 9), plot.title = element_text(size = 10), axis.title.y = element_text(size = 9))
+
+bg1_val <- ggplot(g1, aes(genre, valence)) + geom_boxplot() +labs (title = "\nValence per Genre", y = "Valence", x = "Genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.title.x = element_text(size = 9), plot.title = element_text(size = 10), axis.title.y = element_text(size = 9))
+
+bg1_tempo <- ggplot(g1, aes(genre, tempo)) + geom_boxplot() +labs (title = "\nTempo per Genre", y = "Tempo", x = "Genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.title.x = element_text(size = 9), plot.title = element_text(size = 10), axis.title.y = element_text(size = 9))
+
+bg1_dur <- ggplot(g1, aes(genre, duration_sec)) + geom_boxplot() +labs (title = "\nDuration (sec) per Genre", y = "Duration (sec)", x = "Genre")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.title.x = element_text(size = 9), plot.title = element_text(size = 10), axis.title.y = element_text(size = 9))
+
+
+bg1_dance + bg1_energy + bg1_loud+ bg1_speech + bg1_acoust + bg1_live + bg1_val + bg1_tempo + bg1_dur + plot_layout(ncol = 3)
+
+
+```
+
+Speechiness liveness and duration do not show that much variability between genres. Another interesting thing is that classical has a much different median for many of the predictors. This may suggest that classical would be a good baseline category for the multinomial model. The most promising predictors based on these plots seem to be energy and danceability based on their variation between genres.
+
+```{r, fig.height = 3.7}
+pgm <- ggplot(data = g1, aes(x = genre, fill = mode)) +
+  geom_bar(position = "fill") +
+  labs(y = "Proportion", x = "Genre",
+       title = "Genre vs Mode") + theme(axis.text.x = element_text(angle = 90))
+
+pgk <- ggplot(data = g1, aes(x = genre, fill = key)) +
+  geom_bar(position = "fill", color = "black") +
+  labs(y = "Proportion",  x = "\nGenre",
+       title = "Genre vs Key") + theme(axis.text.x = element_text(angle = 90))
+
+pgk + pgm
+```
+The distribution of keys seems to be consistent throughout each genre. This suggests that genre may be independent from key. Edm, classical, and other genres have roughly an equal proportion of major and minor modes. However, country and rock genres have a higher proportion of major modes.  This suggests that genre may be dependent on mode. 
+\newline
+
+\textbf{Predictor Correlation}
+```{r, figure-side, fig.show="hold", out.width = 230}
+ntype_data <- subset(track_data, select = -c(track.name, artists.names, artists.ids, artist.ids, track.id, release.date, type, id, time_signature, follow, pop, num.artist, genre, mode, key, t_ID))
+
+ntype_data2 <- subset(track_data, select = c(acousticness, instrumentalness, energy, loudness))
+pc1 <- corrplot(cor(ntype_data), type = "upper")
+
+pc2 <- chart.Correlation(ntype_data2, histogram = TRUE, method = "pearson")
+
+```
+The plot on the left shows the correlation between the continuous predictor variables. It is shown that loudness and energy have a high correlation with acousticness and instrumentalness has a high correlation with loudness. The plot on the right gives more detailed information about these variables which seem to be highly correlated. In this plot, it is shown that energy and loudness have a strong negative linear relationship with acousticness. This reflects an assumption that acoustic tracks are generally more "mellow". Similarly loudness and energy have a strong positive linear relationship which reflects the human interpretation that "loud" tracks should have more "energy". The linear ascociation between instrumentalness is a bit harder to interpret. It's only possible linear correlation is with loudness, however this correlation is much weaker than the others. This may be due to low variation of instrumentalness in the dataset with an overwhelming majority of observations having a low instrumentalness value as seen in the Distribution of Predictor Variables plots. 
+
+
+
+
+
+
+
+
