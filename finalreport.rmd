@@ -13,8 +13,11 @@ knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(knitr)
 library(corrplot)
+library(nnet)
+library(broom)
 library(patchwork)
 library(PerformanceAnalytics)
+library(modelr)
 ```
 
 # Introduction
@@ -79,21 +82,30 @@ Towards Data Science published an \href{https://towardsdatascience.com/song-popu
 ```{r}
 track_data <- read.csv('data/spotify_tracksV2.csv')
 track_data <- track_data %>% mutate(genre = ifelse(genre == "edm_dance", "edm", genre))
-track_data <- track_data %>% mutate(duration_ms = duration_ms / 1000) %>% filter_all(any_vars(! is.na(.))) %>% mutate(genre = as.factor(genre)) %>% mutate(key = as.factor(key)) %>% mutate(mode = as.factor(mode)) %>% mutate(t_ID = row_number())
+track_data <- track_data %>% mutate(mode = ifelse (mode == 0, "minor", "major"))
+track_data <- track_data %>% mutate(key = ifelse(key == 0, "C", ifelse(key == 1, "C#", ifelse(key == 2, "D", ifelse(key == 3, "D#", ifelse(key == 4, "E", ifelse(key == 5, "F", ifelse(key == 6, "F#", ifelse(key == 7, "G", ifelse(key == 8, "G#", ifelse(key == 9, "A", ifelse(key == 10, "A#", "B"))))))))))))
+#track_data <- track_data %>% mutate(key = ifelse (key == 0, "C", "D"))
+
+
+track_data <- track_data %>% mutate(duration_ms = duration_ms / 1000) %>% filter_all(any_vars(! is.na(.))) %>% mutate(t_ID = row_number())
 track_data <- rename(track_data,duration_sec = duration_ms)
-
-```
-```{r}
-track_data <- track_data %>% mutate(genre = as.character(genre))
-```
-
-```{r, fig.height = 6}
-p_genre <- ggplot(track_data, aes(x=genre)) + geom_bar() + labs (y = "Count", x = "Track Genre",
-                                                            title = "Number of Tracks per Genre") + theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1), plot.title = element_text(hjust = 0.5))
-
 g1 <- track_data %>% mutate(genre = ifelse(genre == "hiphop", "other", ifelse(genre == "metal", "other", (ifelse(genre == "pop", "other", (ifelse(genre == "punk", "other", genre)))))))
 
-p_g1 <- ggplot(g1, aes(x=genre)) + geom_bar() + labs (y = "\nCount", x = "Track Genre",
+g1 <- g1 %>% mutate(genre = as.factor(genre)) %>% mutate(key = as.factor(key)) %>% mutate(mode = as.factor(mode))
+track_data <- track_data %>% mutate(genre = as.factor(genre)) %>% mutate(key = as.factor(key)) %>% mutate(mode = as.factor(mode))
+
+
+```
+
+
+```{r, fig.height = 6}
+p_genre <- ggplot(track_data, aes(x=genre), fill = genre) + geom_bar() + labs (y = "Count", x = "Track Genre",
+                                                            title = "Number of Tracks per Genre") + theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1), plot.title = element_text(hjust = 0.5))
+
+
+
+
+p_g1 <- ggplot(g1, aes(x=genre,), fill = genre ) + geom_bar() + labs (y = "\nCount", x = "Track Genre",
                                                             title = "Number of Tracks per \nCombined Genre") + theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1), plot.title = element_text(hjust = 0.5)  )
 p_genre + p_g1
 
@@ -199,12 +211,12 @@ Speechiness liveness and duration do not show that much variability between genr
 pgm <- ggplot(data = g1, aes(x = genre, fill = mode)) +
   geom_bar(position = "fill") +
   labs(y = "Proportion", x = "Genre",
-       title = "Genre vs Mode") + theme(axis.text.x = element_text(angle = 90))
+       title = "Genre vs Mode")  + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 pgk <- ggplot(data = g1, aes(x = genre, fill = key)) +
   geom_bar(position = "fill", color = "black") +
   labs(y = "Proportion",  x = "\nGenre",
-       title = "Genre vs Key") + theme(axis.text.x = element_text(angle = 90))
+       title = "Genre vs Key") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 pgk + pgm
 ```
@@ -213,7 +225,7 @@ The distribution of keys seems to be consistent throughout each genre. This sugg
 
 \textbf{Predictor Correlation}
 ```{r, figure-side, fig.show="hold", out.width = 230}
-ntype_data <- subset(track_data, select = -c(track.name, artists.names, artists.ids, artist.ids, track.id, release.date, type, id, time_signature, follow, pop, num.artist, genre, mode, key, t_ID))
+ntype_data <- subset(track_data, select = -c(track.name, artists.names, artists.ids, artist.ids, track.id, release.date, type, id, time_signature, follow, pop, num.artist, genre, mode, key, t_ID) )
 
 ntype_data2 <- subset(track_data, select = c(acousticness, instrumentalness, energy, loudness))
 pc1 <- corrplot(cor(ntype_data), type = "upper")
@@ -221,8 +233,285 @@ pc1 <- corrplot(cor(ntype_data), type = "upper")
 pc2 <- chart.Correlation(ntype_data2, histogram = TRUE, method = "pearson")
 
 ```
+
+
 The plot on the left shows the correlation between the continuous predictor variables. It is shown that loudness and energy have a high correlation with acousticness and instrumentalness has a high correlation with loudness. The plot on the right gives more detailed information about these variables which seem to be highly correlated. In this plot, it is shown that energy and loudness have a strong negative linear relationship with acousticness. This reflects an assumption that acoustic tracks are generally more "mellow". Similarly loudness and energy have a strong positive linear relationship which reflects the human interpretation that "loud" tracks should have more "energy". The linear ascociation between instrumentalness is a bit harder to interpret. It's only possible linear correlation is with loudness, however this correlation is much weaker than the others. This may be due to low variation of instrumentalness in the dataset with an overwhelming majority of observations having a low instrumentalness value as seen in the Distribution of Predictor Variables plots. 
 
+
+## Regression Analysis
+
+### Model Selection
+The model selected was a multinomial model containing all original the original predictor variables and an interaction between key and mode. The model is included in the "Additonal Work" section. It was difficult to justify removing any predictor variables because ANOVA tests indicated that all predictor variables had at least one parameter not equal to 0. The key variable only contained the base note, however musical keys are not defined by a single base note note, but rather the base note and the mode (C major, A minor, etc.) making an intertaction between the two seem very likely. The interaction was also justified with a lower residual deviance and higher prediction accuracy compared to the model without an interaction. 
+
+### Model Performance
+Confusion Matrix
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r, echo = FALSE, results='hide', message=FALSE}
+full_model <- multinom(genre ~ danceability + energy + loudness + speechiness + acousticness + instrumentalness + liveness + valence + tempo + duration_sec + key * mode, data = g1)
+
+```
+```{r}
+pred_probs <- as_tibble(predict(full_model, type = "probs")) %>% 
+                        mutate(t_ID = 1:n()) 
+
+full_m_aug <- inner_join(g1, pred_probs, 
+                           by = "t_ID") %>%
+  select(t_ID, everything())
+
+full_m_aug <- full_m_aug %>% 
+  mutate(pred_gen = predict(full_model, type = "class"))
+
+residuals <- as_tibble(residuals(full_model)) %>%  #calculate residuals
+  setNames(paste('resid.', names(.), sep = "")) %>% #update column names
+  mutate(t_ID = 1:n()) #add obs number
+
+
+full_m_aug <- inner_join(full_m_aug, residuals, by = "t_ID") %>%
+  select(t_ID, everything())
+
+
+
+conf_m <- full_m_aug %>% 
+  count(genre, pred_gen, .drop = FALSE) %>%
+  pivot_wider(names_from = pred_gen, values_from = n)
+
+nclass = 1461 + 22+ 26+10+8
+ncountry = 22+545+38+29+197
+nother=10+50+251+759+339
+nrock = 8+119+130+186+922
+nedm = 26+69+1037+189+125
+conf_m <- conf_m %>% mutate(accuracy = ifelse(genre == "classical", round(1461/nclass, digits = 3),
+                                              ifelse(genre == "edm", round(1037/nedm, digits = 3),
+                                                     ifelse(genre == "other", round(759/nother, digits = 3),
+                                                            ifelse(genre == "rock", round(922/nrock, digits = 3), round(545/ncountry, digits = 3)
+                                                                    )))), .after = rock)
+
+kable(conf_m)
+```
+
+
+
+
+### Model Assumptions
+\textbf{Random Sample:} The sample was randomly selected from Spotify's available genres and playlists for genres on their API. However, it is unknown if the available genres and playlists are a random sample from the population of genres and playlists on Spotify. It is possible that Spotify selects which genres and playlists are available to API users. Because it is unknown if the available genres and playlists of Spotify are a random sample of the popualtion, it is difficult to assume randomness. 
+
+\textbf{Independence:} Independence is also difficult to assume. From the correlation plots, energy and loudness both have a strong linear relationship with acousticness is shown. However, an ANOVA test suggested that acousticness should still be included in the model. This may be due to the number of categories in the response. The linear relationship between these variables is not as strong for all genres. Particularly, the tracks included in the rock genre have a much weaker linear relationship between these variables than the entire dataset. This suggests that the ANOVA test still included acousticness because for some of the categories in the response such as rock genre, energy, loudness, and acousticness may still be independent. 
+
+\break
+
+\textbf{Linearity: } The following are selected residual plots.
+```{r}
+full_m_aug_rock <- full_m_aug %>% filter(genre == "rock")
+
+
+full_m_aug_class <- full_m_aug %>% filter(genre == "classical")
+
+
+full_m_aug_edm <- full_m_aug %>% filter(genre == "edm")
+
+full_m_aug_other <- full_m_aug %>% filter(genre == "other")
+
+
+full_m_aug_country <- full_m_aug %>% filter(genre == "country")
+
+```
+
+```{r, fig.height = 3}
+pcr1 <- ggplot(data = full_m_aug, aes(country, y=resid.country)) +
+  
+  stat_summary_bin(fun='mean', bins= sqrt(nrow(full_m_aug_country)),
+                    size=1, geom='point')  + labs(y = "Residual",  x = "Predicted Proability",
+       title = "Country Residual vs Predicted") 
+
+pcr2 <- ggplot(data = full_m_aug, aes(x=other, y=resid.other)) +
+  
+  stat_summary_bin(fun='mean', bins= sqrt(nrow(full_m_aug_other)),
+                   size=1, geom='point')  + labs(y = "Residual",  x = "Predicted Proability",
+       title = "Other Residual vs Predicted") + theme(plot.title = element_text(size = 11))
+
+pcr3 <- ggplot(data = full_m_aug, aes(classical, y=resid.classical)) +
+  
+  stat_summary_bin(fun='mean', bins= sqrt(nrow(full_m_aug_class)),
+                   size=1, geom='point')  + labs(y = "Residual",  x = "Predicted Proability",
+       title = "Classical Residual vs Predicted") + theme(plot.title = element_text(size = 11))
+
+pcr4 <- ggplot(data = full_m_aug, aes(x=edm, y=resid.edm)) +
+  
+  stat_summary_bin(fun='mean', bins= sqrt(nrow(full_m_aug_edm)),
+             size=1, geom='point')  + labs(y = "Residual",  x = "Predicted Proability",
+       title = "EDM Residual vs Predicted") + theme(plot.title = element_text(size = 11))
+
+pcr5 <- ggplot(data = full_m_aug, aes(x=rock, y=resid.rock)) +
+  
+  stat_summary_bin(fun='mean', bins= sqrt(nrow(full_m_aug_rock)),
+                  size=1, geom='point')  + labs(y = "Residual",  x = "Predicted Proability",
+       title = "Rock Residual vs Predicted")
+
+pcr2+pcr3
+
+```
+
+
+
+
+```{r,fig.height = 3}
+pca1 <- ggplot(data = full_m_aug_country, aes(x=acousticness, y=resid.country)) +
+  
+  stat_summary_bin(fun='mean', bins= sqrt(nrow(full_m_aug_country)) * 2,
+                    size=1, geom='point')  + labs(y = "Residual",  x = "Acousticness",
+       title = "Country Residual vs Acousticness") + theme(plot.title = element_text(size = 11))
+
+pca2 <- ggplot(data = full_m_aug_other, aes(x=acousticness, y=resid.other)) +
+  
+  stat_summary_bin(fun='mean', bins= sqrt(nrow(full_m_aug_other)) * 2,
+                    size=1, geom='point')  + labs(y = "Residual",  x = "Acousticness",
+       title = "Other Residual vs Acousticness") 
+
+pca3 <- ggplot(data = full_m_aug_class, aes(x=acousticness, y=resid.classical)) +
+  
+  stat_summary_bin(fun='mean', bins= sqrt(nrow(full_m_aug_class)) * 2,
+                    size=1, geom='point')  + labs(y = "Residual",  x = "Acousticness",
+       title = "Classical Residual vs Acousticness") 
+
+pca4 <- ggplot(data = full_m_aug_edm, aes(x=acousticness, y=resid.edm)) +
+  
+  stat_summary_bin(fun='mean', bins= sqrt(nrow(full_m_aug_edm)) * 2,
+                    size=1, geom='point')  + labs(y = "Residual",  x = "Acousticness",
+       title = "EDM Residual vs Acousticness") 
+
+pca5 <- ggplot(data = full_m_aug_rock, aes(x=acousticness, y=resid.rock)) +
+  
+  stat_summary_bin(fun='mean', bins= sqrt(nrow(full_m_aug_rock)) * 2,
+                   size=1, geom='point')  + labs(y = "Residual",  x = "Acousticness",
+       title = "Rock Residual vs Acousticness") + theme(plot.title = element_text(size = 11))
+
+pcd6 <- ggplot(data = full_m_aug_other, aes(x=liveness, y=resid.other)) +
+  
+  stat_summary_bin(fun='mean', bins= sqrt(nrow(full_m_aug_other) * 2),
+                   size=1, geom='point')  + labs(y = "Residual",  x = "Liveness",
+       title = "Other Residual vs Liveness") + theme(plot.title = element_text(size = 11))
+
+
+pca1 + pcd6
+
+
+```
+In the residual plot vs predicted other (top left) and the residual plot vs predicted classical (top right) constant variance is not shown. In the residual plot vs predicted other, a clear pattern is observed. However, in the residual plot vs predicted classical plot, a clear pattern is not observed. 
+
+
+The plot on the bottom left shows the binned country residual vs acousticness. A clear linear pattern is observed. However, the variance seems relatively constant. The plot on the bottom right shows the binned other genre residual vs danceability. A clear pattern is not observed but the variance is not constant as indicated by the fan shape.
+
+
+The four above plots are examples of the wide range of linearity across the predictor variables. It is difficult to assume linearity. 
+
+\break
+
+## Discussion
+
+The overall performance of the model is quite impressive. A total prediction accuracy of 72% is very high considering there are 5 response categories. This is strong evidence to support that Spotify's audio features accurately measure the human interpretation of audio. 
+
+\begin{center} Other Genre Prediction Matrix \end{center}
+
+\begin{table}[htp]\centering
+\scalebox{0.7}{
+
+\begin{tabular}{|l|l|l|l|l|l|}
+\hline
+                      & True Other & False Classical & False EDM & False Country & False Rock \\
+Number of Predictions & 759        & 10              & 251       & 50            & 339        \\ \hline
+\% Predicted          & 53.9       & 0.07            & 17.8      & 3             & 24         \\ \hline
+
+\end{tabular}
+}
+\end{table}
+
+
+Other genre showed the the most error. However, false predictions of other genre may reflect the human interpretation of track genre. Other genre contained metal and punk genres. Humans find metal and punk very similar to rock and their genres could easily be mistaken. This could explain the high proportion of false rock predictions for other genre and could actually be evidence that the audio features capture human interpretation of audio. A similar interpretation does not explain the high proportion of false edm predictions however. 
+
+
+\begin{center} Examples of Model Paramaters Reflecting Human Interpretation 
+
+\begin{table}[htp]\centering
+\scalebox{0.7}{
+
+\begin{tabular}{|l|l|l|l|l|l|}
+\hline
+Genre   & Variable         & Param. Est. & P-Value & Conf. Low & Conf. High \\ \hline
+EDM     & Danceability     & 14.124      & 0.000   & 13.502    & 14.747     \\ \hline
+Country & Instrumentalness & -7.773      & 0.000   & -8.872    & -6.674     \\ \hline
+Rock    & Acousticness     & -5.014      & 0.000   & -5.732    & -4.266     \\ \hline
+\end{tabular}
+}
+\end{table}
+ \end{center} 
+Humans would expect eletronic dance music (EDM) to be much more "danceable" than classical music. This is reflected in the model showing a 14.124 increase of the log odds of a track belonging to the EDM genre as oppose to the classical genre based on a tracks danceability value. 
+
+Humans would also expect country music to have more singing than classical music.  This is reflected in the model showing a 7.773 decrease of the log odds of a track belonging to the country genre as oppose to the classical genre based on a tracks instrumentalness value (instrumentalness is intended to decrease with more singing in a track)
+
+Finally, humans expect rock music to not be acoustic and classical music to be acoustic. This is reflected in the model showing a 5.014 decrease of the log odds of a track belonging to the rock genre as oppose to the classical genre based on a track acousticness value. 
+
+These parameters are examples of how the model may reflect some of the human interpretation of audio to predict genre. It is evidence to support that Spotify's audio features accurately represent human interpetation. There are more examples of human interpretation reflected in the model which can be found on the complete model paramater list in the "Additonal Work" section. 
+
+Overall, the model does contain evidence that 
+
+
+
+
+
+
+```{r}
+red_model <- multinom(genre ~ danceability + loudness + speechiness + instrumentalness  + liveness + valence  + duration_sec +  acousticness+  energy + key * mode, data = g1)
+
+
+```
+```{r}
+AIC(full_model)
+```
+```{r}
+AIC(red_model)
+```
+
+```{r}
+anova(red_model, full_model, test = "Chisq") %>%
+  kable(format = "markdown")
+```
+
+
+```{r}
+summary(full_model)
+```
+
+
+
+```{r}
+
+track_datac <- g1 %>% mutate(genre = as.character(genre))
+track_datac <- track_datac %>% filter(genre == "rock")
+glimpse(track_datac)
+ntype_datac <- subset(track_datac, select = -c(track.name, artists.names, artists.ids, artist.ids, track.id, release.date, type, id, time_signature, follow, pop, num.artist, genre, mode, key, t_ID) )
+
+pc1 <- corrplot(cor(ntype_datac), type = "upper")
+```
+```{r}
+tidy(full_model, conf.int = TRUE, exponentiate = FALSE) %>%
+  kable(digits = 3, format = "markdown")
+```
 
 
 
