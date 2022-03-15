@@ -499,7 +499,7 @@ Rock    & Acousticness     & -5.014      & 0.000   & -5.732    & -4.266     \\ \
 \end{tabular}
 }
 \end{table}
- \end{center} 
+
 Humans would expect eletronic dance music (EDM) to be much more "danceable" than classical music. This is reflected in the model showing a 14.124 increase of the log odds of a track belonging to the EDM genre as oppose to the classical genre based on a tracks danceability value. 
 
 Humans would also expect country music to have more singing than classical music.  This is reflected in the model showing a 7.773 decrease of the log odds of a track belonging to the country genre as oppose to the classical genre based on a tracks instrumentalness value (instrumentalness is intended to decrease with more singing in a track)
